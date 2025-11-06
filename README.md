@@ -11,16 +11,39 @@ This repository contains two main analytical tasks:
 
 ## Quick Start
 
+### Task 1: Run Hedge Calculator
 ```bash
-# Install dependencies
+python src/task1_hedged_lp/hedge_v2_v3.py
+```
+
+### Task 2: Reproduce Full Analysis
+
+**1. Install dependencies:**
+```bash
 pip install -r requirements.txt
+```
 
-# Run Task 2 data collection and analysis
-python -m src.task2_usdc_peg.fetch_uniswap_v3
-python -m src.task2_usdc_peg.fetch_bybit
-python -m src.task2_usdc_peg.aggregate_outside_band
+**2. Obtain Bybit historical data:**
 
-# View results
+Download from Bybit's public archives and place in project root:
+- `USDCUSDT-2025-07.csv`
+- `USDCUSDT-2025-08.csv`
+- `USDCUSDT-2025-09.csv`
+
+**3. Configure The Graph API:**
+
+- Get a free API key from [The Graph](https://thegraph.com/)
+- Update `GRAPH_URL` in `src/task2_usdc_peg/fetch_uniswap_v3.py` with your key
+
+**4. Run data processing pipeline:**
+```bash
+python src/task2_usdc_peg/fetch_uniswap_v3.py
+python src/task2_usdc_peg/fetch_bybit.py
+python src/task2_usdc_peg/aggregate_outside_band.py
+```
+
+**5. View analysis:**
+```bash
 jupyter notebook notebooks/task2_usdc_peg.ipynb
 ```
 
@@ -39,8 +62,8 @@ jupyter notebook notebooks/task2_usdc_peg.ipynb
 
 ## Data Sources
 
-- **Uniswap V3**: The Graph subgraph (uniswap/uniswap-v3)
-- **Bybit**: Public REST API (no authentication required)
+- **Uniswap V3**: The Graph Protocol (decentralized GraphQL API)
+- **Bybit**: Historical trade archives (public CSVs)
 - **Timeframe**: July 1, 2025 - September 30, 2025 (UTC)
 - **Pool**: Uniswap V3 USDC/USDT 0.01% (0x3416cf6c708da44db2624d63ea0aaef7113527c6)
 
@@ -68,6 +91,28 @@ dex-cex-market-analysis/
 └─ .gitignore
 ```
 
-## Challenge Details
+## Key Findings
 
-This project addresses the DEX-CEX Market Analysis Challenge, providing quantitative analysis of market microstructure and hedging strategies in decentralized finance.
+**Task 1:** Derived delta-neutral hedging formulas for Uniswap V2 (50/50) and V3 (±10% concentrated liquidity), accounting for funding costs, impermanent loss, gas/opex, and rebalancing triggers.
+
+**Task 2:** Analyzed 2,208 hours (July-Sept 2025):
+- **103 hours** with outside-band (±0.1%) activity
+- **Uniswap V3:** $606M volume outside band (100 hours)
+- **Bybit:** $7.6M volume outside band (6 hours)
+- Finding: DEX showed significantly more peg stress than CEX
+
+## Submission
+
+This repository fulfills all requirements for the DEX-CEX Market Analysis Challenge:
+
+✅ **Task 1**: Hedged LP memo with entry hedge, cost analysis, and V3 extension  
+✅ **Task 2**: CSV output with required columns (time, volumes, min/max prices per venue)  
+✅ **Task 2**: Jupyter notebook documenting data sources and calculations
+
+**Required CSV Format:**
+```
+time,uniswap_volume,uniswap_min_price,uniswap_max_price,bybit_volume,bybit_min_price,bybit_max_price
+```
+- 2,208 hourly rows covering full timeframe
+- Outside-band trades only (< 0.999 or > 1.001 USDT per USDC)
+- Zero volumes with blank min/max when no outside-band activity

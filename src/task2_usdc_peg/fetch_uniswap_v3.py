@@ -1,8 +1,5 @@
-"""
+﻿"""
 Fetch Uniswap V3 USDC/USDT swap data from The Graph.
-
-This module queries the Uniswap V3 subgraph for swap data from the
-USDC/USDT 0.01% pool and processes it for peg deviation analysis.
 """
 
 import requests
@@ -17,34 +14,17 @@ from utils import (
     round_to_hour, is_outside_band, save_to_parquet, create_temp_dir
 )
 
-# Configuration
-# Use The Graph decentralized Gateway
-GRAPH_URL = "https://gateway.thegraph.com/api/[api-key]/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
-# Or use the free public endpoint (rate limited)
-GRAPH_URL_FREE = "https://api.thegraph.com/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
+GRAPH_URL = "https://gateway.thegraph.com/api/ea4eb1e837994a4f8c3490679e97af5e/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
 POOL_ADDRESS = "0x3416cf6c708da44db2624d63ea0aaef7113527c6"
 START_TIMESTAMP = int(datetime(2025, 7, 1, tzinfo=timezone.utc).timestamp())
 END_TIMESTAMP = int(datetime(2025, 9, 30, 23, 59, 59, tzinfo=timezone.utc).timestamp())
-BATCH_SIZE = 1000  # Number of swaps per query
-BATCH_DAYS = 7  # Query 7 days at a time to avoid timeouts
+BATCH_SIZE = 1000
+BATCH_DAYS = 7
 
 
 def build_query(pool_id: str, timestamp_gte: int, timestamp_lt: int, 
                 first: int = 1000, last_id: str = "") -> str:
-    """
-    Build GraphQL query for Uniswap V3 swaps with proper pagination.
-    
-    Args:
-        pool_id: Pool address (lowercase)
-        timestamp_gte: Start timestamp
-        timestamp_lt: End timestamp (exclusive)
-        first: Number of records to fetch
-        last_id: Last ID for pagination (use id_gt)
-        
-    Returns:
-        GraphQL query string
-    """
-    # Build where clause
+    """Build GraphQL query for swaps with pagination."""
     where_parts = [
         f'pool: "{pool_id.lower()}"',
         f'timestamp_gte: {timestamp_gte}',
@@ -87,17 +67,7 @@ def build_query(pool_id: str, timestamp_gte: int, timestamp_lt: int,
 
 
 def fetch_swaps_for_day(pool_id: str, day_start: int, day_end: int) -> List[Dict[str, Any]]:
-    """
-    Fetch all swaps for a single day using pagination.
-    
-    Args:
-        pool_id: Pool address
-        day_start: Day start timestamp
-        day_end: Day end timestamp
-        
-    Returns:
-        List of all swap records for the day
-    """
+    """Fetch all swaps for a day using id_gt pagination."""
     all_swaps = []
     last_id = ""
     page = 0
@@ -106,8 +76,7 @@ def fetch_swaps_for_day(pool_id: str, day_start: int, day_end: int) -> List[Dict
         query = build_query(pool_id, day_start, day_end, BATCH_SIZE, last_id)
         
         try:
-            # Use the free endpoint (rate limited but available)
-            response = requests.post(GRAPH_URL_FREE, json={'query': query}, timeout=30)
+            response = requests.post(GRAPH_URL, json={'query': query}, timeout=30)
             response.raise_for_status()
             
             data = response.json()

@@ -1,8 +1,5 @@
 """
-Utility functions for USDC peg deviation analysis.
-
-This module provides helper functions for data processing, timestamp handling,
-and price band calculations.
+Utils for USDC peg deviation analysis.
 """
 
 import pandas as pd
@@ -11,41 +8,22 @@ from datetime import datetime, timezone
 from decimal import Decimal, getcontext
 from typing import Tuple, Optional
 
-# Set precision for decimal calculations
 getcontext().prec = 28
 
-# Price band constants
 BAND_LOWER = Decimal('0.9990')
 BAND_UPPER = Decimal('1.0010')
 BAND_CENTER = Decimal('1.0000')
 
 
 def round_to_hour(timestamp: int) -> str:
-    """
-    Round timestamp to the top of the hour in UTC.
-    
-    Args:
-        timestamp: Unix timestamp in seconds
-        
-    Returns:
-        ISO8601 formatted hour string (YYYY-MM-DDTHH:00:00Z)
-    """
+    """Round unix timestamp to top of hour (ISO8601)."""
     dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-    # Round down to the hour
     hour_dt = dt.replace(minute=0, second=0, microsecond=0)
     return hour_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
 def is_outside_band(price: float) -> bool:
-    """
-    Check if price is outside the ±0.1% band around 1.0000.
-    
-    Args:
-        price: USDT per USDC price
-        
-    Returns:
-        True if price is outside band, False otherwise
-    """
+    """Check if price is outside ±0.1% band (0.999-1.001)."""
     if pd.isna(price) or price <= 0:
         return False
     
@@ -56,32 +34,15 @@ def is_outside_band(price: float) -> bool:
 def calculate_price_from_amounts(amount0: float, amount1: float, 
                                 token0_decimals: int, token1_decimals: int,
                                 token0_symbol: str, token1_symbol: str) -> float:
-    """
-    Calculate USDT per USDC price from token amounts.
-    
-    Args:
-        amount0: Amount of token0
-        amount1: Amount of token1
-        token0_decimals: Decimals for token0
-        token1_decimals: Decimals for token1
-        token0_symbol: Symbol for token0
-        token1_symbol: Symbol for token1
-        
-    Returns:
-        Price as USDT per USDC
-    """
-    # Normalize amounts by decimals
+    """Calculate USDT per USDC from raw amounts."""
     norm_amount0 = amount0 / (10 ** token0_decimals)
     norm_amount1 = amount1 / (10 ** token1_decimals)
     
-    # Determine which token is USDC and which is USDT
     if token0_symbol == 'USDC' and token1_symbol == 'USDT':
-        # USDC is token0, USDT is token1
         if norm_amount0 == 0:
             return np.nan
         return norm_amount1 / norm_amount0
     elif token0_symbol == 'USDT' and token1_symbol == 'USDC':
-        # USDT is token0, USDC is token1
         if norm_amount1 == 0:
             return np.nan
         return norm_amount0 / norm_amount1
@@ -90,62 +51,28 @@ def calculate_price_from_amounts(amount0: float, amount1: float,
 
 
 def safe_divide(numerator: float, denominator: float) -> float:
-    """
-    Safely divide two numbers, returning NaN if denominator is zero.
-    
-    Args:
-        numerator: Numerator value
-        denominator: Denominator value
-        
-    Returns:
-        Division result or NaN
-    """
+    """Safe division, returns NaN if denom is zero."""
     if denominator == 0 or pd.isna(denominator):
         return np.nan
     return numerator / denominator
 
 
 def validate_price(price: float) -> bool:
-    """
-    Validate that price is within reasonable bounds.
-    
-    Args:
-        price: USDT per USDC price
-        
-    Returns:
-        True if price is valid, False otherwise
-    """
+    """Check price is reasonable (0.5-2.0 range)."""
     if pd.isna(price):
         return False
     return 0.5 <= price <= 2.0
 
 
 def validate_volume(volume: float) -> bool:
-    """
-    Validate that volume is positive.
-    
-    Args:
-        volume: Volume in USDC terms
-        
-    Returns:
-        True if volume is valid, False otherwise
-    """
+    """Check volume is positive."""
     if pd.isna(volume):
         return False
     return volume > 0
 
 
 def aggregate_hourly_data(df: pd.DataFrame, venue: str) -> pd.DataFrame:
-    """
-    Aggregate data by hour for a specific venue.
-    
-    Args:
-        df: DataFrame with columns ['timestamp', 'price', 'volume']
-        venue: Venue name ('uniswap' or 'bybit')
-        
-    Returns:
-        Aggregated DataFrame with hourly data
-    """
+    """Aggregate trades by hour for given venue."""
     if df.empty:
         return pd.DataFrame(columns=[
             'time', f'{venue}_volume', f'{venue}_min_price', f'{venue}_max_price'

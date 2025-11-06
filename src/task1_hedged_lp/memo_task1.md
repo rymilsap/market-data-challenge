@@ -100,13 +100,12 @@ For V3 with ±10% range around price P₀:
 
 ## Conclusion
 
-The hedged LP strategy provides delta neutrality but introduces significant operational complexity and costs. V3 concentrated liquidity amplifies these challenges while offering higher fee potential. Success requires sophisticated risk management, automated rebalancing systems, and careful cost-benefit analysis of hedging frequency.
+Hedged LP provides delta neutrality but adds operational complexity and costs. V3 amplifies this - you get higher fee potential but need tighter risk management.
 
-**Key Success Factors**:
+**Critical factors for success**:
 
-1. Automated monitoring and rebalancing systems
-2. Optimized gas usage through batching
-3. Careful selection of CEX perp markets
-4. Dynamic range management for V3 positions
+1. Automated monitoring and rebalancing
+2. Batch operations to minimize gas
+3. CEX perp market selection
+4. Dynamic range management (V3)
 5. Regular cost-benefit analysis of hedge frequency
-

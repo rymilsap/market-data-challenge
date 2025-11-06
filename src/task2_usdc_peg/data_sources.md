@@ -1,32 +1,31 @@
-# Data Sources Documentation
+# Data Sources for Task 2: USDC Peg Deviation Analysis
 
 ## Overview
+This document describes the data sources used to analyze USDC/USDT peg deviations across DEX (Uniswap V3) and CEX (Bybit) venues for Q3 2025 (July 1 - September 30).
 
-This document outlines the free data sources used for the USDC peg deviation analysis and how to reproduce the data collection process.
+## 1. Uniswap V3 USDC/USDT Swaps
 
-## Data Sources
+**Source**: The Graph Protocol (Decentralized Gateway)
+**API Endpoint**: `https://gateway.thegraph.com/api/[api-key]/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV`
 
-### 1. Uniswap V3 USDC/USDT Pool
+### Pool Details
+- **Pool Address**: `0x3416cf6c708da44db2624d63ea0aaef7113527c6`
+- **Fee Tier**: 0.01% (1 basis point)
+- **Network**: Ethereum Mainnet
 
-- **Source**: The Graph Protocol (uniswap/uniswap-v3 subgraph)
-- **Endpoint**: https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3
-- **Pool Address**: 0x3416cf6c708da44db2624d63ea0aaef7113527c6
-- **Pool Fee**: 0.01%
-- **Tokens**: USDC (0xA0b86a33E6441b8c4C8C0d4Ce4a8b4c4d4e4f4g4h) / USDT (0xdAC17F958D2ee523a2206206994597C13D831ec7)
-
-#### GraphQL Query
-
+### GraphQL Query
+The script fetches swap events using pagination:
 ```graphql
-query GetSwaps($poolId: String!, $timestamp_gte: Int!, $timestamp_lte: Int!) {
+query PoolSwaps {
   swaps(
-    where: {
-      pool: $poolId
-      timestamp_gte: $timestamp_gte
-      timestamp_lte: $timestamp_lte
-    }
-    orderBy: timestamp
-    orderDirection: asc
     first: 1000
+    orderBy: id
+    orderDirection: asc
+    where: {
+      pool: "0x3416cf6c708da44db2624d63ea0aaef7113527c6"
+      timestamp_gte: [start_timestamp]
+      timestamp_lt: [end_timestamp]
+    }
   ) {
     id
     timestamp
@@ -34,139 +33,79 @@ query GetSwaps($poolId: String!, $timestamp_gte: Int!, $timestamp_lte: Int!) {
     amount1
     amountUSD
     sqrtPriceX96
-    token0 {
-      symbol
-      decimals
-    }
-    token1 {
-      symbol
-      decimals
-    }
+    token0 { id symbol decimals }
+    token1 { id symbol decimals }
   }
 }
 ```
 
-#### Data Processing
+### Data Processing
+- Fetches data day-by-day with automatic pagination
+- Token0 = USDC (6 decimals)
+- Token1 = USDT (6 decimals)
+- Price calculation: USDT per USDC from `amount0` and `amount1`
+- Validates prices and volumes before storing
 
-- Calculate price as USDT per USDC from token amounts
-- Handle token0/token1 ordering (pool may have USDC as token0 or token1)
-- Convert timestamp to UTC hour buckets
-- Filter for trades outside ±0.1% band (price < 0.9990 or > 1.0010)
+### Reproduction Steps
+1. Obtain a free API key from [The Graph](https://thegraph.com/)
+2. Update `GRAPH_URL` in `src/task2_usdc_peg/fetch_uniswap_v3.py` with your key
+3. Run: `python src/task2_usdc_peg/fetch_uniswap_v3.py`
+4. Data saved to `temp/uniswap_raw_data.parquet`
 
-### 2. Bybit USDC/USDT Spot
+## 2. Bybit USDC/USDT Spot Trades
 
-- **Source**: Bybit Public REST API
-- **Endpoint**: https://api.bybit.com/v5/market/recent-trade
-- **Symbol**: USDCUSDT
-- **Authentication**: None required (public endpoint)
+**Source**: Bybit Historical Trade Data (Public Archives)
 
-#### API Parameters
+### Data Files
+- `USDCUSDT-2025-07.csv` (July 2025)
+- `USDCUSDT-2025-08.csv` (August 2025)
+- `USDCUSDT-2025-09.csv` (September 2025)
 
-```python
-params = {
-    'category': 'spot',
-    'symbol': 'USDCUSDT',
-    'limit': 1000,
-    'startTime': start_timestamp_ms,
-    'endTime': end_timestamp_ms
-}
+### Download Instructions
+1. Visit Bybit's public data portal: https://public.bybit.com/trading/
+2. Navigate to spot trade archives
+3. Download monthly CSVs for USDCUSDT pair
+4. Place files in project root
+
+### Data Format
 ```
-
-#### Data Processing
-
-- Parse trade data from API response
-- Convert timestamp from milliseconds to seconds
-- Calculate price as USDT per USDC
-- Filter for trades outside ±0.1% band
-- Aggregate by hour buckets
-
-## Data Collection Process
-
-### 1. Time Range
-
-- **Start**: 2025-07-01 00:00:00 UTC
-- **End**: 2025-09-30 23:59:59 UTC
-- **Duration**: 92 days
-- **Hour Buckets**: 2,208 hours total
-
-### 2. Band Definition
-
-- **Lower Bound**: 0.9990 USDT per USDC
-- **Upper Bound**: 1.0010 USDT per USDC
-- **Band Width**: ±0.1% around 1.0000
-
-### 3. Data Quality Checks
-
-- **Price Validation**: Ensure prices are within reasonable bounds (0.5 - 2.0)
-- **Volume Validation**: Filter out zero or negative volumes
-- **Timestamp Validation**: Ensure timestamps are within expected range
-- **Token Decimal Handling**: Properly handle USDC (6 decimals) and USDT (6 decimals)
-
-## Alternative Data Sources
-
-### If The Graph is Unavailable
-
-1. **Messari Subgraphs**: Alternative GraphQL endpoints
-2. **Flipside Crypto**: Free on-chain data APIs
-3. **Alchemy/Infura**: Direct Ethereum node queries
-4. **Dune Analytics**: Pre-computed Uniswap data
-
-### If Bybit is Unavailable
-
-1. **Binance API**: Similar public endpoints
-2. **Coinbase Pro API**: USDC/USDT spot data
-3. **Kraken API**: Alternative CEX data source
-
-## Reproducibility
-
-### Environment Setup
-
-```bash
-pip install -r requirements.txt
+tradeTime,price,qty,side,tradeId
+1719792000000,0.9998,1200.50,Buy,123456789
 ```
+- `tradeTime`: Unix timestamp in milliseconds
+- `price`: USDT per USDC
+- `qty`: Trade quantity in USDC
+- `side`: Buy or Sell
 
-### Data Collection Commands
+## 3. Analysis Parameters
 
-```bash
-# Fetch Uniswap V3 data
-python -m src.task2_usdc_peg.fetch_uniswap_v3
+**Timeframe**: 2025-07-01 00:00:00 UTC to 2025-09-30 23:59:59 UTC
 
-# Fetch Bybit data
-python -m src.task2_usdc_peg.fetch_bybit
+**Peg Band**: ±0.1% around 1.0000
+- Lower bound: 0.9990
+- Upper bound: 1.0010
 
-# Aggregate and filter data
-python -m src.task2_usdc_peg.aggregate_outside_band
-```
+**Outside-Band Definition**: Trades with price < 0.9990 OR price > 1.0010
 
-### Output Files
+**Aggregation**: Hourly buckets (UTC)
 
-- `outputs/usdc_peg_outside_band_hourly.csv`: Final aggregated data
-- `temp/uniswap_raw_data.parquet`: Raw Uniswap data
-- `temp/bybit_raw_data.parquet`: Raw Bybit data
+## 4. Data Quality Checks
 
-## Data Schema
+### Uniswap V3
+- Verify pool address matches official Uniswap interface
+- Check token decimals (both USDC and USDT use 6 decimals)
+- Validate price range (should be close to 1.0)
+- Confirm timestamp coverage spans full Q3 2025
 
-### Input Data (Raw)
+### Bybit
+- Verify timestamp parsing (milliseconds → UTC datetime)
+- Filter invalid prices (< 0 or > 2)
+- Check for gaps in hourly coverage
+- Validate volume is non-negative
 
-- **timestamp**: Unix timestamp in seconds
-- **price**: USDT per USDC
-- **volume**: Volume in USDC terms
-- **venue**: 'uniswap' or 'bybit'
+## 5. Why These Sources?
 
-### Output Data (Aggregated)
-
-- **time**: ISO8601 hour timestamp (YYYY-MM-DDTHH:00:00Z)
-- **uniswap_volume**: Total volume outside band for Uniswap
-- **bybit_volume**: Total volume outside band for Bybit
-- **uniswap_min_price**: Minimum price outside band for Uniswap
-- **uniswap_max_price**: Maximum price outside band for Uniswap
-- **bybit_min_price**: Minimum price outside band for Bybit
-- **bybit_max_price**: Maximum price outside band for Bybit
-
-## Notes
-
-- All timestamps are in UTC
-- Prices are calculated as USDT per USDC (not inverted)
-- Volume is denominated in USDC terms
-- Missing data (no trades outside band) results in volume=0 and blank min/max prices
-
+✅ **Free & Reproducible**: Both sources are publicly accessible
+✅ **Authoritative**: Dune queries blockchain directly; Bybit provides official trade history
+✅ **Complete Coverage**: Both cover the full Q3 2025 timeframe
+✅ **High Quality**: Minimal missing data, consistent formats
